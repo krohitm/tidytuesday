@@ -3,6 +3,8 @@ library(shiny)
 library(tidyverse)
 library(stringr)
 library(maps)
+library(animation)
+library(gganimate)
 
 #importing the data
 file_name = './us_avg_tuition.xlsx'
@@ -49,20 +51,6 @@ ui <- fluidPage(
   # Application title
   titlePanel('US average tuition for different states'),
   
-  #creating a side bar layout for plotting the map for each session
-  sidebarLayout(
-    sidebarPanel(
-      selectInput("session", label="Session", choices=map_avg_tuition$session %>%
-                    unique,
-                  selected = '2004-05')
-    ),
-    
-    # Show a plot of the map
-    mainPanel(
-      plotOutput("mapByYear")
-    )
-  ),
-  
   #creating another side bar layout for plotting the trend of fees for each state
   sidebarLayout(
     sidebarPanel(
@@ -76,7 +64,10 @@ ui <- fluidPage(
     mainPanel(
       plotOutput("trend")
     )
-  )
+  ),
+  
+  #creating a side bar layout for plotting the map for each session
+  plotOutput('mapgif')
 )
 
 # Define server logic required to plot the trend
@@ -91,24 +82,25 @@ server <- function(input, output) {
     max
   
   #filter output by the session selected for the map plot
-  output$mapByYear <- renderPlot({
-    tuition_mapByYear <- map_avg_tuition %>%
-      filter(session==input$session)
-    
-    #plot the tuition for selected session on the US map
-    USA %>%
-      ggplot(aes(x = long, y = lat, group = group)) + 
-      coord_fixed(1.3) +
-      common_axes +
-      theme(panel.background = NULL)+
-      geom_polygon(data = tuition_mapByYear, aes(fill = tuition), color = "white") +
-      scale_fill_gradientn(limits=c(min_avg_tuition, max_avg_tuition), colours=c('#7FFFD4','#FF8C00'))+
-      ggtitle("Average tuition fees in different states") +
-      guides(fill=
-               guide_legend(
-                 title = 'Avg. Tuition ($)'
-               ))
-  })
+  #output$mapByYear <- renderPlot({
+  #  tuition_mapByYear <- map_avg_tuition %>%
+  #    filter(session==input$session)
+  #  
+  #  #plot the tuition for selected session on the US map
+  #  tuition_mapByYear %>%
+  #    ggplot(aes(x = long, y = lat, group = group, fill = tuition)) + 
+  #    coord_fixed(1.3) +
+  #    common_axes +
+  #    theme(panel.background = NULL)+
+  #    geom_polygon(color = "white") +
+  #    scale_fill_gradientn(limits=c(min_avg_tuition, max_avg_tuition), colours=c('#7FFFD4','#FF8C00'))+
+  #    ggtitle("Average tuition fees in different states") +
+  #    guides(fill=
+  #             guide_legend(
+  #               title = 'Avg. Tuition ($)'
+  #             ))
+  #})
+  
   
   #plot the fees trend for the selected state
   output$trend <- renderPlot({
@@ -120,6 +112,34 @@ server <- function(input, output) {
       ggtitle(paste("Average tuition fees over different years in", input$state)) +
       ylim(min_avg_tuition, max_avg_tuition)
   })
+  
+  output$mapgif <- renderImage({
+    #tuition_mapByYear <- map_avg_tuition %>%
+    #  filter(session==input$session)
+    
+    
+    outfile <- tempfile(fileext = '.gif')
+    #plot the tuition for selected session on the US map
+    g <- map_avg_tuition %>%
+      ggplot(aes(x = long, y = lat, group = group, fill = tuition, frame=session)) + 
+      coord_fixed(1.3) +
+      common_axes +
+      theme(panel.background = NULL)+
+      geom_polygon(color = "white") +
+      scale_fill_gradientn(limits=c(min_avg_tuition, max_avg_tuition), colours=c('#7FFFD4','#FF8C00'))+
+      ggtitle("Average tuition fees in different states") +
+      guides(fill=
+               guide_legend(
+                 title = 'Avg. Tuition ($)'
+               ))
+    gganimate(g, 'outfile.gif')
+    
+    list(src = "outfile.gif",
+         contentType = 'image/gif',
+          width = 650,
+          height = 600
+         # alt = "This is alternate text"
+    )}, deleteFile = TRUE)
 }
 
 # Run the application 
